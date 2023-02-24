@@ -1,9 +1,9 @@
 [submodule "Vmr.Dependency1"]
-	path = src
+	path = src/Vmr.Dependency1
 	url = https://dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency1
 [submodule "Vmr.Dependency2"]
-	path = src
+	path = src/Vmr.Dependency2
 	url = https://dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency2
 [submodule "Vmr.Service1"]
-	path = src
+	path = src/Vmr.Service1
 	url = https://dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Service1
