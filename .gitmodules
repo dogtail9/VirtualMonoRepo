@@ -1,0 +1,3 @@
+[submodule "Vmr.Dependency1"]
+	path = src
+	url = https://dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency1
