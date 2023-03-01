@@ -1,0 +1,179 @@
+# mm HH DD MM DW
+#  \  \  \  \  \__ Days of week
+#   \  \  \  \____ Months
+#    \  \  \______ Days
+#     \  \________ Hours
+#      \__________ Minutes
+schedules:
+  - cron: "0 0 * * *"
+    displayName: Daily midnight build
+    always: "true"
+    branches:
+      include:
+        - main
+        - feature/*
+
+trigger:
+  branches:
+    include:
+      - user/*
+      - feature/*
+      - epic/*
+      - main
+  paths:
+    exclude:
+      - Samples
+
+resources:
+  repositories:
+  - repository: PipelineTemplates
+    type: git
+    name: VirtualMonoRepo/Vmr.PipelineTemplates
+    ref: main
+#   - repository: Vmr_Dependency1
+#     type: git
+#     name: VirtualMonoRepo/Vmr.Dependency1
+#     ref: main
+#   - repository: Vmr_Dependency2
+#     type: git
+#     name: VirtualMonoRepo/Vmr.Dependency2
+#     ref: main
+  # - ${{ each repo in variables.Repos }}:
+  #   - repository: $[replace${{ repo.name }}, '.', '_')]
+  #     type: git
+  #     name: ${{ repo.name }}
+  #     ref: ${{ repo.branch }}
+
+variables:
+  - template: PipelineTemplates/Variables.yml@PipelineTemplates
+    parameters:
+      Major: 1
+      Minor: 2
+      Patch: 3
+      PreRelease: "Preview.5"
+      ${{ if contains(variables['Build.SourceBranch'], 'release') }}:
+        IsRelease: 'true'
+      ${{ if not(contains(variables['Build.SourceBranch'], 'release')) }}:
+        IsRelease: 'false'
+
+parameters:
+  - name: poolImage
+    displayName: Pool Image
+    type: string
+    default: ubuntu-latest
+    values:
+      - ubuntu-latest
+      - ubuntu-22.04
+      - ubuntu-20.04
+      - windows-latest
+      - windows-2022
+      - windows-2019
+      - macOS-latest
+      - macOS-12
+      - macOS-11
+  
+  - name: DotnetSdkVersions
+    type: object
+    default: 
+      - '6.x'
+      - '7.x'
+  
+  - name: PackageFeed
+    default: 'VirtualMonoRepo/VirtualMonoRepo_CI2'
+
+  - name: CreateDebugArtifact
+    displayName: Create Debug Artifact
+    type: boolean
+    default: 'true'
+
+  - name: Repositories
+    type: object
+    default: 
+    - Name: Vmr.Dependency1
+      Repository: dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency1
+      Branch: "main"
+      Type: 'Library'
+    - Name: Vmr.Dependency2
+      Repository: dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency2
+      Branch: "main"
+      Type: 'Library'
+    # - Name: Vmr.WebApi1
+    #   Repository: dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.WebApi1
+    #   Branch: "main"
+    #   Type: 'WebApi'
+
+stages:
+    - stage: Build
+      dependsOn: []
+      displayName: Build Everything
+      
+      jobs:
+        - job: 'Build'
+          dependsOn: []
+          displayName: Build Everything
+          pool:
+            vmImage: ${{ parameters.PoolImage }}
+          steps:
+            - checkout: self
+              # persistCredentials: true
+
+            # - template: PipelineTemplates/Build/Jobs/UpdateBuildNumber.yml@PipelineTemplates  
+            #   parameters:
+            #     PoolImage: ${{ parameters.PoolImage }}
+
+            - pwsh: |
+                Write-Host "##vso[build.updatebuildnumber]$(SemanticVersion.SemanticVersion)"
+              name: UpdateBuildNumber
+              displayName: Update Build Number - $(SemanticVersion.SemanticVersion)
+
+            - script: |
+                git config --global user.email 'build@dogtail.se'
+                git config --global user.name 'build'
+              displayName: Configure git
+
+            - ${{ each repo in parameters.Repositories }}:
+              - powershell: |
+                  git clone https://build:$(PAT)@${{ repo.Repository }} --progress --branch ${{ repo.Branch }} --single-branch --depth=1 $(Build.SourcesDirectory)/${{ repo.Name }}
+                displayName: 'Clone ${{ repo.Name }}'
+            
+            - template: PipelineTemplates/Build/Steps/UseDotnetSdk.yml@PipelineTemplates
+              parameters: 
+                DotnetSdkVersions: ${{ parameters.DotnetSdkVersions }}
+
+            - ${{ each repo in parameters.Repositories }}:
+              - ${{ if eq(repo.Type, 'Library') }}:
+                - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
+                  parameters:
+                    SolutionToBuild: '${{ repo.Name }}/**/*.sln'
+                    PackageFeed: ${{ parameters.PackageFeed }}
+
+                - template: PipelineTemplates/Build/Steps/RunUnitTests.yml@PipelineTemplates 
+                  parameters:
+                    TestProjects:
+                      - name: 'Unit Tests'
+                        projects: '**/*.UnitTests.csproj'
+                      - name: 'SpecFlow Tests'
+                        projects: '**/*.Specs.csproj'
+            
+            - template: PipelineTemplates/Build/Steps/PublishCodeCoverage.yml@PipelineTemplates 
+
+            - template: PipelineTemplates/Build/Steps/CreateArtifact.yml@PipelineTemplates 
+              parameters:
+                ArtifactName: 'NuGet'
+                Contents: |
+                  **/*.nupkg
+                  **/*.snupkg
+
+            - ${{ each repo in parameters.Repositories }}:
+              - ${{ if eq(repo.Type, 'WebApi') }}:
+                - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
+                  parameters:
+                    SolutionToBuild: '${{ repo.Name }}/**/*.sln'
+                    PackageFeed: ${{ parameters.PackageFeed }}
+                
+            
+
+            - ${{ if eq(parameters.CreateDebugArtifact, 'true') }}:
+              - template: PipelineTemplates/CreateDebugArtifact.yml@PipelineTemplates
+                parameters:
+                  name: 'DEBUG_BUILD'              

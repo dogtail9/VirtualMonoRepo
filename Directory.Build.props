@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <ReleaseBuild>True</ReleaseBuild>
+  </PropertyGroup>
+</Project>
