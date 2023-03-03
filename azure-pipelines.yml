@@ -140,20 +140,34 @@ stages:
               parameters: 
                 DotnetSdkVersions: ${{ parameters.DotnetSdkVersions }}
 
-            - ${{ each repo in parameters.Repositories }}:
-              - ${{ if eq(repo.Type, 'Library') }}:
-                - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
-                  parameters:
-                    SolutionToBuild: '${{ repo.Name }}/**/*.sln'
-                    PackageFeed: ${{ parameters.PackageFeed }}
+            - pwsh: |
+                $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -Recurse | Resolve-Path -Relative
+                dotnet new sln --name All --output .
+                foreach ($projectFile in $allProjectFiles)
+                {
+                    dotnet sln All.sln add $projectFile
+                }
+              displayName: Create Solution File
+            
+            - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
+              parameters:
+                SolutionToBuild: '*.sln'
+                PackageFeed: ${{ parameters.PackageFeed }}
 
-                - template: PipelineTemplates/Build/Steps/RunUnitTests.yml@PipelineTemplates 
-                  parameters:
-                    TestProjects:
-                      - name: 'Unit Tests'
-                        projects: '**/*.UnitTests.csproj'
-                      - name: 'SpecFlow Tests'
-                        projects: '**/*.Specs.csproj'
+            # - ${{ each repo in parameters.Repositories }}:
+            #   - ${{ if eq(repo.Type, 'Library') }}:
+            #     - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
+            #       parameters:
+            #         SolutionToBuild: '${{ repo.Name }}/**/*.sln'
+            #         PackageFeed: ${{ parameters.PackageFeed }}
+
+            - template: PipelineTemplates/Build/Steps/RunUnitTests.yml@PipelineTemplates 
+              parameters:
+                TestProjects:
+                  - name: 'Unit Tests'
+                    projects: '**/*.UnitTests.csproj'
+                  - name: 'SpecFlow Tests'
+                    projects: '**/*.Specs.csproj'
             
             - template: PipelineTemplates/Build/Steps/PublishCodeCoverage.yml@PipelineTemplates 
 
@@ -164,12 +178,12 @@ stages:
                   **/*.nupkg
                   **/*.snupkg
 
-            - ${{ each repo in parameters.Repositories }}:
-              - ${{ if eq(repo.Type, 'WebApi') }}:
-                - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
-                  parameters:
-                    SolutionToBuild: '${{ repo.Name }}/**/*.sln'
-                    PackageFeed: ${{ parameters.PackageFeed }}
+            # - ${{ each repo in parameters.Repositories }}:
+            #   - ${{ if eq(repo.Type, 'WebApi') }}:
+            #     - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
+            #       parameters:
+            #         SolutionToBuild: '${{ repo.Name }}/**/*.sln'
+            #         PackageFeed: ${{ parameters.PackageFeed }}
                 
             
 
