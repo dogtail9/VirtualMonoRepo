@@ -30,19 +30,18 @@ resources:
     type: git
     name: VirtualMonoRepo/Vmr.PipelineTemplates
     ref: main
-#   - repository: Vmr_Dependency1
-#     type: git
-#     name: VirtualMonoRepo/Vmr.Dependency1
-#     ref: main
-#   - repository: Vmr_Dependency2
-#     type: git
-#     name: VirtualMonoRepo/Vmr.Dependency2
-#     ref: main
-  # - ${{ each repo in variables.Repos }}:
-  #   - repository: $[replace${{ repo.name }}, '.', '_')]
-  #     type: git
-  #     name: ${{ repo.name }}
-  #     ref: ${{ repo.branch }}
+  - repository: Vmr_Dependency1
+    type: git
+    name: VirtualMonoRepo/Vmr.Dependency1
+    ref: main
+  - repository: Vmr_Dependency2
+    type: git
+    name: VirtualMonoRepo/Vmr.Dependency2
+    ref: main
+  - repository: Vmr_Service1
+    type: git
+    name: VirtualMonoRepo/Vmr.Service1
+    ref: main
 
 variables:
   - template: PipelineTemplates/Variables.yml@PipelineTemplates
@@ -86,22 +85,6 @@ parameters:
     type: boolean
     default: 'true'
 
-  - name: Repositories
-    type: object
-    default: 
-    - Name: Vmr.Dependency1
-      Repository: dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency1
-      Branch: "main"
-      Type: 'Library'
-    - Name: Vmr.Dependency2
-      Repository: dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.Dependency2
-      Branch: "main"
-      Type: 'Library'
-    # - Name: Vmr.WebApi1
-    #   Repository: dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/Vmr.WebApi1
-    #   Branch: "main"
-    #   Type: 'WebApi'
-
 stages:
     - stage: Build
       dependsOn: []
@@ -115,26 +98,14 @@ stages:
             vmImage: ${{ parameters.PoolImage }}
           steps:
             - checkout: self
-              # persistCredentials: true
-
-            # - template: PipelineTemplates/Build/Jobs/UpdateBuildNumber.yml@PipelineTemplates  
-            #   parameters:
-            #     PoolImage: ${{ parameters.PoolImage }}
+            - checkout: Vmr_Dependency1
+            - checkout: Vmr_Dependency2
+            - checkout: Vmr_Service1
 
             - pwsh: |
                 Write-Host "##vso[build.updatebuildnumber]$(SemanticVersion.SemanticVersion)"
               name: UpdateBuildNumber
               displayName: Update Build Number - $(SemanticVersion.SemanticVersion)
-
-            - script: |
-                git config --global user.email 'build@dogtail.se'
-                git config --global user.name 'build'
-              displayName: Configure git
-
-            - ${{ each repo in parameters.Repositories }}:
-              - powershell: |
-                  git clone https://build:$(PAT)@${{ repo.Repository }} --progress --branch ${{ repo.Branch }} --single-branch --depth=1 $(Build.SourcesDirectory)/${{ repo.Name }}
-                displayName: 'Clone ${{ repo.Name }}'
             
             - template: PipelineTemplates/Build/Steps/UseDotnetSdk.yml@PipelineTemplates
               parameters: 
@@ -154,13 +125,6 @@ stages:
                 SolutionToBuild: '*.sln'
                 PackageFeed: ${{ parameters.PackageFeed }}
 
-            # - ${{ each repo in parameters.Repositories }}:
-            #   - ${{ if eq(repo.Type, 'Library') }}:
-            #     - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
-            #       parameters:
-            #         SolutionToBuild: '${{ repo.Name }}/**/*.sln'
-            #         PackageFeed: ${{ parameters.PackageFeed }}
-
             - template: PipelineTemplates/Build/Steps/RunUnitTests.yml@PipelineTemplates 
               parameters:
                 TestProjects:
@@ -177,15 +141,6 @@ stages:
                 Contents: |
                   **/*.nupkg
                   **/*.snupkg
-
-            # - ${{ each repo in parameters.Repositories }}:
-            #   - ${{ if eq(repo.Type, 'WebApi') }}:
-            #     - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
-            #       parameters:
-            #         SolutionToBuild: '${{ repo.Name }}/**/*.sln'
-            #         PackageFeed: ${{ parameters.PackageFeed }}
-                
-            
 
             - ${{ if eq(parameters.CreateDebugArtifact, 'true') }}:
               - template: PipelineTemplates/CreateDebugArtifact.yml@PipelineTemplates
