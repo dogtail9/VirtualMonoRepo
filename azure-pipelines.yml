@@ -74,7 +74,7 @@ parameters:
   - name: DotnetSdkVersions
     type: object
     default: 
-      - '6.x'
+      # - '6.x'
       - '7.x'
   
   - name: PackageFeed
@@ -114,12 +114,29 @@ stages:
             - pwsh: |
                 $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -Recurse | Resolve-Path -Relative
                 dotnet new sln --name All --output .
+                $webProjects = ""
                 foreach ($projectFile in $allProjectFiles)
                 {
                     dotnet sln All.sln add $projectFile
+                    $content = Get-Content -Path $projectFile -Raw
+                    if($content.Contains("Microsoft.NET.Sdk.Web"))
+                    {
+                        $webProjects = $webProjects + "," + $projectFile
+                    }
                 }
+
+                $webProjects = $webProjects.trimstart(",")
+                Write-Host "##vso[task.setvariable variable=webprojects;]$webProjects"
               displayName: Create Solution File
-            
+
+            - ${{ each webproject in split(variables['webprojects'], '.') }}:
+              - pwsh: |
+                  Write-Host $(webprojects)
+                  Write-Host ${{ webproject }}
+                  Write-Host ${{ webproject.key }}
+                  Write-Host ${{ webproject.value }}
+                displayName: Debug Web ${{ webproject.key }}
+
             - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
               parameters:
                 SolutionToBuild: '*.sln'
