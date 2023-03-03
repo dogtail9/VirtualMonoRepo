@@ -91,13 +91,48 @@ stages:
       displayName: Build Everything
       
       jobs:
+        # - job: PrepareBuild
+        #   dependsOn: []
+        #   displayName: Prepare Build
+        #   pool:
+        #     vmImage: ${{ parameters.PoolImage }}
+        #   steps:
+        #     - checkout: self
+        #     - checkout: Vmr_Dependency1
+        #     - checkout: Vmr_Dependency2
+        #     - checkout: Vmr_Service1
+        #     - pwsh: |
+        #         $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -Recurse | Resolve-Path -Relative
+        #         $webProjects = ""
+        #         foreach ($projectFile in $allProjectFiles)
+        #         {
+        #             $content = Get-Content -Path $projectFile -Raw
+        #             if($content.Contains("Microsoft.NET.Sdk.Web"))
+        #             {
+        #                 $webProjects = $webProjects + "," + $projectFile
+        #             }
+        #         }
+
+        #         $webProjects = $webProjects.trimstart(",")
+        #         Write-Host "##vso[task.setvariable variable=webprojects;isoutput=true]$webProjects"
+        #       name: getWebProjects
+        #       displayName: Create Solution File
+
         - job: 'Build'
           dependsOn: []
           displayName: Build Everything
           pool:
             vmImage: ${{ parameters.PoolImage }}
+          variables:
+            myWebProjects: $[ dependencies.PrepareBuild.outputs['getWebProjects.webprojects'] ]
+            projectList: ${{ variables.myWebProjects }}
+          # parameters:
+          #   - name: parameterprojectList
+          #     type: object
+          #     default: $[ split(variables['projectList'], '.') ]
           steps:
             - checkout: self
+              #path: s #$(Build.SourcesDirectory)
             - checkout: Vmr_Dependency1
             - checkout: Vmr_Dependency2
             - checkout: Vmr_Service1
@@ -114,28 +149,25 @@ stages:
             - pwsh: |
                 $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -Recurse | Resolve-Path -Relative
                 dotnet new sln --name All --output .
-                $webProjects = ""
                 foreach ($projectFile in $allProjectFiles)
                 {
                     dotnet sln All.sln add $projectFile
-                    $content = Get-Content -Path $projectFile -Raw
-                    if($content.Contains("Microsoft.NET.Sdk.Web"))
-                    {
-                        $webProjects = $webProjects + "," + $projectFile
-                    }
                 }
-
-                $webProjects = $webProjects.trimstart(",")
-                Write-Host "##vso[task.setvariable variable=webprojects;]$webProjects"
+                Write-Host "WebProjects"
+                Write-Host $(myWebProjects)
+                Copy-Item -Path $(Build.SourcesDirectory)\VirtualMonoRepo\Directory.Build.props -Destination $(Build.SourcesDirectory)\Directory.Build.props
+                #Write-Host $(projectList)
+                #Write-Host ${{ variables.webprojects }}
               displayName: Create Solution File
 
-            - ${{ each webproject in split(variables['webprojects'], '.') }}:
-              - pwsh: |
-                  Write-Host $(webprojects)
-                  Write-Host ${{ webproject }}
-                  Write-Host ${{ webproject.key }}
-                  Write-Host ${{ webproject.value }}
-                displayName: Debug Web ${{ webproject.key }}
+            # - ${{ each webproject in split(variables.myWebProjects, '.') }}:
+            #   - pwsh: |
+            #       Write-Host $(myWebProjects)
+            #       #Write-Host $(webproject)
+            #       Write-Host ${{ webproject }}
+            #       Write-Host ${{ webproject.key }}
+            #       Write-Host ${{ webproject.value }}
+            #     displayName: Debug Web ${{ webproject }}
 
             - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
               parameters:
@@ -152,12 +184,33 @@ stages:
             
             - template: PipelineTemplates/Build/Steps/PublishCodeCoverage.yml@PipelineTemplates 
 
+
             - template: PipelineTemplates/Build/Steps/CreateArtifact.yml@PipelineTemplates 
               parameters:
                 ArtifactName: 'NuGet'
                 Contents: |
                   **/*.nupkg
                   **/*.snupkg
+            
+            - pwsh: |
+                $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -Recurse | Resolve-Path -Relative
+                foreach ($projectFile in $allProjectFiles)
+                {
+                    $content = Get-Content -Path $projectFile -Raw
+                    if($content.Contains("Microsoft.NET.Sdk.Web"))
+                    {
+                        $projectName = (Get-Item $projectFile).BaseName
+                        dotnet publish $projectFile --no-build -c Release -o $(Build.ArtifactStagingDirectory)/WebApplications/$projectName /p:UseAppHost=false
+                    }
+                }
+              displayName: Publish Web Projects
+
+            - task: PublishPipelineArtifact@1
+              displayName: 'Publish Artifact: Web Applications'
+              inputs:
+                targetPath: '$(Build.ArtifactStagingDirectory)/WebApplications'
+                artifact: 'Web Applications'
+                publishLocation: 'pipeline'
 
             - ${{ if eq(parameters.CreateDebugArtifact, 'true') }}:
               - template: PipelineTemplates/CreateDebugArtifact.yml@PipelineTemplates
