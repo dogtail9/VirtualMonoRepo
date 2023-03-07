@@ -91,33 +91,6 @@ stages:
       displayName: Build Everything
       
       jobs:
-        # - job: PrepareBuild
-        #   dependsOn: []
-        #   displayName: Prepare Build
-        #   pool:
-        #     vmImage: ${{ parameters.PoolImage }}
-        #   steps:
-        #     - checkout: self
-        #     - checkout: Vmr_Dependency1
-        #     - checkout: Vmr_Dependency2
-        #     - checkout: Vmr_Service1
-        #     - pwsh: |
-        #         $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -Recurse | Resolve-Path -Relative
-        #         $webProjects = ""
-        #         foreach ($projectFile in $allProjectFiles)
-        #         {
-        #             $content = Get-Content -Path $projectFile -Raw
-        #             if($content.Contains("Microsoft.NET.Sdk.Web"))
-        #             {
-        #                 $webProjects = $webProjects + "," + $projectFile
-        #             }
-        #         }
-
-        #         $webProjects = $webProjects.trimstart(",")
-        #         Write-Host "##vso[task.setvariable variable=webprojects;isoutput=true]$webProjects"
-        #       name: getWebProjects
-        #       displayName: Create Solution File
-
         - job: 'Build'
           dependsOn: []
           displayName: Build Everything
@@ -126,26 +99,26 @@ stages:
           variables:
             myWebProjects: $[ dependencies.PrepareBuild.outputs['getWebProjects.webprojects'] ]
             projectList: ${{ variables.myWebProjects }}
-          # parameters:
-          #   - name: parameterprojectList
-          #     type: object
-          #     default: $[ split(variables['projectList'], '.') ]
+         
           steps:
-            # - checkout: self
-            #   clean: true
-            #   persistCredentials: true
-            #   path: $(Build.SourcesDirectory)
             - checkout: Vmr_Dependency1
+              path: code/Vmr.Dependency1
             - checkout: Vmr_Dependency2
+              path: code/Vmr.Dependency2
             - checkout: Vmr_Service1
-
-            # - ${{ each repo in resources.repositories }}:
-            #   - pwsh: |
-            #       Write-Host $(repo.name)
+              path: code/Vmr.Service1
+         
             - pwsh: |
                 Write-Host "##vso[build.updatebuildnumber]$(SemanticVersion.SemanticVersion)"
               name: UpdateBuildNumber
               displayName: Update Build Number - $(SemanticVersion.SemanticVersion)
+
+            - pwsh: |
+                $repoDirectories = Get-ChildItem -Directory -Force $(Agent.BuildDirectory)/code
+                foreach($repoDir in $repoDirectories)
+                {
+                  Copy-Item -Path $repoDir -Destination $(Build.SourcesDirectory) -Recurse
+                }
 
             - pwsh: | 
                 git config --global user.email 'releasebuild@dogtail.se'
