@@ -101,9 +101,6 @@ stages:
           displayName: Build Everything
           pool:
             vmImage: ${{ parameters.PoolImage }}
-          variables:
-            myWebProjects: $[ dependencies.PrepareBuild.outputs['getWebProjects.webprojects'] ]
-            projectList: ${{ variables.myWebProjects }}
          
           steps:
             - checkout: Vmr_Dependency1
