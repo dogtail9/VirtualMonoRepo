@@ -50,9 +50,9 @@ variables:
       Minor: 2
       Patch: 3
       PreRelease: "Preview.5"
-      ${{ if contains(variables['Build.SourceBranch'], 'release') }}:
+      ${{ if contains(parameters['BuildRelease'], 'true') }}:
         IsRelease: 'true'
-      ${{ if not(contains(variables['Build.SourceBranch'], 'release')) }}:
+      ${{ if contains(parameters['BuildRelease'], 'false') }}:
         IsRelease: 'false'
 
 parameters:
@@ -70,7 +70,17 @@ parameters:
       - macOS-latest
       - macOS-12
       - macOS-11
-  
+
+  - name: BuildRelease
+    displayName: Build Release
+    type: boolean
+    default: 'false'
+
+  - name: CreateDebugArtifact
+    displayName: Create Debug Artifact
+    type: boolean
+    default: 'false'
+
   - name: DotnetSdkVersions
     type: object
     default: 
@@ -79,11 +89,6 @@ parameters:
   
   - name: PackageFeed
     default: 'VirtualMonoRepo/VirtualMonoRepo_CI2'
-
-  - name: CreateDebugArtifact
-    displayName: Create Debug Artifact
-    type: boolean
-    default: 'true'
 
 stages:
     - stage: Build
@@ -104,9 +109,11 @@ stages:
             - checkout: Vmr_Dependency1
               path: code/Vmr.Dependency1
               persistCredentials: true
+
             - checkout: Vmr_Dependency2
               path: code/Vmr.Dependency2
               persistCredentials: true
+            
             - checkout: Vmr_Service1
               path: code/Vmr.Service1
               persistCredentials: true
@@ -122,8 +129,9 @@ stages:
                 {
                   Copy-Item -Path $repoDir -Destination $(Build.SourcesDirectory) -Recurse
                 }
+              displayName: Copy source to build folder
 
-            - pwsh: | 
+            - pwsh: |
                 git config --global user.email 'releasebuild@dogtail.se'
                 git config --global user.name 'ReleaseBuild'
                 git config --global init.defaultBranch main
@@ -137,11 +145,8 @@ stages:
                 git init
                 git remote add origin https://build:$(System.AccessToken)@dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/VirtualMonoRepo 
                 git pull origin main --allow-unrelated-histories
-                #git checkout -b dependencybot/$(Build.BuildNumber)
-                #git clone https://dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/VirtualMonoRepo -c http.extraheader="AUTHORIZATION: bearer $(System.AccessToken)" --branch main --depth 1 $(Build.SourcesDirectory)
-              displayName: Checkout 'dependencybot/$(Build.BuildNumber)'
-              env:
-                ACCESSTOKEN: $(System.AccessToken)
+                git checkout -b release/$(Build.BuildNumber)
+              displayName: Create build branch
             
             - template: PipelineTemplates/Build/Steps/UseDotnetSdk.yml@PipelineTemplates
               parameters: 
@@ -154,28 +159,9 @@ stages:
                 {
                     dotnet sln All.sln add $projectFile
                 }
-                Write-Host "WebProjects"
-                Write-Host $(myWebProjects)
+
                 Copy-Item -Path $(Build.SourcesDirectory)\VirtualMonoRepo\* -Destination $(Build.SourcesDirectory)\ -Recurse
-                #Remove-Item -LiteralPath $(Build.SourcesDirectory)\VirtualMonoRepo -Force -Recurse
-                #Write-Host $(projectList)
-                #Write-Host ${{ variables.webprojects }}
               displayName: Create Solution File
-
-            - script: | 
-                git config --global user.email 'releasebuild@dogtail.se'
-                git config --global user.name 'ReleaseBuild'
-                git checkout -b release/$(Build.BuildNumber)
-              displayName: Checkout 'release/$(Build.BuildNumber)'
-
-            # - ${{ each webproject in split(variables.myWebProjects, '.') }}:
-            #   - pwsh: |
-            #       Write-Host $(myWebProjects)
-            #       #Write-Host $(webproject)
-            #       Write-Host ${{ webproject }}
-            #       Write-Host ${{ webproject.key }}
-            #       Write-Host ${{ webproject.value }}
-            #     displayName: Debug Web ${{ webproject }}
 
             - template: PipelineTemplates/Build/Steps/BuildDotnetSolution.yml@PipelineTemplates  
               parameters:
@@ -218,24 +204,23 @@ stages:
                 targetPath: '$(Build.ArtifactStagingDirectory)/WebApplications'
                 artifact: 'Web Applications'
                 publishLocation: 'pipeline'
-
-            - script: |
-                git add .
-                git commit -m "Release-$(Build.BuildNumber)"
-              displayName: "Commit Release $(Build.BuildNumber)"
-
-            - script: |
-                git push --set-upstream origin release/$(Build.BuildNumber) 
-              displayName: Push release/$(Build.BuildNumber)
             
-            - pwsh: |
-                $repoDirectories = Get-ChildItem -Directory -Force $(Agent.BuildDirectory)/code
-                foreach($repoDir in $repoDirectories)
-                {
-                  cd $repoDir
-                  git tag -a $(Build.BuildNumber) -m $(Build.BuildNumber)
-                  git push origin $(Build.BuildNumber)
-                }
+            - ${{ if contains(parameters['BuildRelease'], 'true') }}:
+              - pwsh: |
+                  git add .
+                  git commit -m "Release-$(Build.BuildNumber)"
+                  git push --set-upstream origin release/$(Build.BuildNumber) 
+                displayName: "Create Release Branch"
+              
+              - pwsh: |
+                  $repoDirectories = Get-ChildItem -Directory -Force $(Agent.BuildDirectory)/code
+                  foreach($repoDir in $repoDirectories)
+                  {
+                    cd $repoDir
+                    git tag -a $(Build.BuildNumber) -m $(Build.BuildNumber)
+                    git push origin $(Build.BuildNumber)
+                  }
+                displayName: "Create Release Tags"
 
             - ${{ if eq(parameters.CreateDebugArtifact, 'true') }}:
               - template: PipelineTemplates/CreateDebugArtifact.yml@PipelineTemplates
