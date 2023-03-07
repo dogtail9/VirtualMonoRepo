@@ -134,7 +134,7 @@ stages:
             # - checkout: self
             #   clean: true
             #   persistCredentials: true
-              # dirPath: $(Build.SourcesDirectory)
+            #   path: $(Build.SourcesDirectory)
             - checkout: Vmr_Dependency1
             - checkout: Vmr_Dependency2
             - checkout: Vmr_Service1
@@ -147,10 +147,17 @@ stages:
               name: UpdateBuildNumber
               displayName: Update Build Number - $(SemanticVersion.SemanticVersion)
 
-            - script: | 
+            - pwsh: | 
                 git config --global user.email 'releasebuild@dogtail.se'
                 git config --global user.name 'ReleaseBuild'
                 git config --global init.defaultBranch main
+
+                $gitFolders = Get-ChildItem -Directory -Force -Recurse *.git | Resolve-Path -Relative
+                foreach ($gitFolder in $gitFolders)
+                {
+                  Remove-Item -Force -Recurse -Path $gitFolder
+                }
+
                 git init
                 git remote add origin https://build:$(System.AccessToken)@dogtail.visualstudio.com/DefaultCollection/VirtualMonoRepo/_git/VirtualMonoRepo 
                 git pull origin main --allow-unrelated-histories
