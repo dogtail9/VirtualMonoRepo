@@ -103,10 +103,13 @@ stages:
           steps:
             - checkout: Vmr_Dependency1
               path: code/Vmr.Dependency1
+              persistCredentials: true
             - checkout: Vmr_Dependency2
               path: code/Vmr.Dependency2
+              persistCredentials: true
             - checkout: Vmr_Service1
               path: code/Vmr.Service1
+              persistCredentials: true
          
             - pwsh: |
                 Write-Host "##vso[build.updatebuildnumber]$(SemanticVersion.SemanticVersion)"
@@ -224,6 +227,15 @@ stages:
             - script: |
                 git push --set-upstream origin release/$(Build.BuildNumber) 
               displayName: Push release/$(Build.BuildNumber)
+            
+            - pwsh: |
+                $repoDirectories = Get-ChildItem -Directory -Force $(Agent.BuildDirectory)/code
+                foreach($repoDir in $repoDirectories)
+                {
+                  cd $repoDir
+                  git tag -a $(Build.BuildNumber) -m $(Build.BuildNumber)
+                  git push origin $(Build.BuildNumber)
+                }
 
             - ${{ if eq(parameters.CreateDebugArtifact, 'true') }}:
               - template: PipelineTemplates/CreateDebugArtifact.yml@PipelineTemplates
