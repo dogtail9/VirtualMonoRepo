@@ -114,7 +114,7 @@ stages:
             - checkout: Vmr_Service1
               path: code/Vmr.Service1
               persistCredentials: true
-         
+            
             - pwsh: |
                 Write-Host "##vso[build.updatebuildnumber]$(SemanticVersion.SemanticVersion)"
               name: UpdateBuildNumber
@@ -144,7 +144,14 @@ stages:
                 git pull origin main --allow-unrelated-histories
                 git checkout -b release/$(Build.BuildNumber)
               displayName: Create build branch
-            
+
+            - task: PublishPipelineArtifact@1
+              displayName: Publish d3js
+              inputs:
+                targetPath: '$(Build.SourcesDirectory)/d3js.html'
+                artifact: 'd3js'
+                publishLocation: 'pipeline'
+
             - template: PipelineTemplates/Build/Steps/UseDotnetSdk.yml@PipelineTemplates
               parameters: 
                 DotnetSdkVersions: ${{ parameters.DotnetSdkVersions }}
