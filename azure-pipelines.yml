@@ -145,13 +145,14 @@ stages:
                 git checkout -b release/$(Build.BuildNumber)
               displayName: Create build branch
 
-            - task: PublishPipelineArtifact@1
-              displayName: Publish d3js
-              inputs:
-                targetPath: '$(Build.SourcesDirectory)/d3js.html'
-                artifact: 'd3js'
-                publishLocation: 'pipeline'
-
+            # - task: PublishPipelineArtifact@1
+            #   displayName: Publish d3js
+            #   inputs:
+            #     targetPath: '$(Build.SourcesDirectory)/d3js.html'
+            #     artifact: 'd3js'
+            #     publishLocation: 'pipeline'
+            - pwsh: |
+                Write-Host "##vso[task.uploadsummary]$(Build.SourcesDirectory)/d3js.html"
             - template: PipelineTemplates/Build/Steps/UseDotnetSdk.yml@PipelineTemplates
               parameters: 
                 DotnetSdkVersions: ${{ parameters.DotnetSdkVersions }}
