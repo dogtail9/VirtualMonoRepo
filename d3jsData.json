@@ -1,0 +1,23 @@
+{
+    "nodes": [
+        {
+            "id": "Vmr.Service1"
+        },
+        {
+            "id": "Vmr.Dependency2"
+        },
+        {
+            "id": "Vmr.Dependency1"
+        }
+    ],
+    "links": [
+        {
+            "from": "Vmr.Service1",
+            "to": "Vmr.Dependency2"
+        },
+        {
+            "from": "Vmr.Dependency2",
+            "to": "Vmr.Dependency1"
+        }
+    ]
+}
