@@ -50,5 +50,6 @@ $root = @{
     nodes = $nodes
     links = $links
 }
-$json = $root | ConvertTo-Json
+$json = $root | ConvertTo-Json | Out-File -FilePath .\d3js.json
 Write-Host $json;
+
