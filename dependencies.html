@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<style>
+  .link {
+    stroke: #ccc;
+  }
+
+  .node text {
+    pointer-events: none;
+    font: 10px sans-serif;
+  }
+</style>
+<body>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script>
+    var width = 960,
+      height = 500;
+
+    var svg = d3
+      .select("body")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    var force = d3.layout
+      .force()
+      .gravity(0.05)
+      .distance(100)
+      .charge(-100)
+      .size([width, height]);
+
+      var json = {
+  "links": [],
+  "nodes": []
+}
+var linkMap = json.nodes.map((node) => node.id);
+var edges = json.links.map((link) => {
+  return {
+    source: linkMap.indexOf(link.from),
+    target: linkMap.indexOf(link.to),
+  };
+});
+force
+  .nodes(json.nodes)
+  .links(edges)
+  //   .id((node) => {
+  //     return node.id;
+  //   })
+  .start();
+
+var link = svg
+  .selectAll(".link")
+  .data(edges)
+  .enter()
+  .append("line")
+  .attr("class", "link");
+
+var node = svg
+  .selectAll(".node")
+  .data(json.nodes)
+  .enter()
+  .append("g")
+  .attr("class", "node")
+  .call(force.drag);
+
+var svg = node
+  .append("svg")
+  //.attr("xlink:href", "https://github.com/favicon.ico")
+  // .attr("xlink:href", (d) => {
+  //   if (d.type === "Web") {
+  //     return "https://github.com/favicon.ico";
+  //   } else if (d.type === "Library") {
+  //     return "https://dn.se/favicon.ico";
+  //   }
+  // })
+  .attr("x", -8)
+  .attr("y", -8)
+  .attr("width", 48)
+  .attr("height", 48);
+
+  svg.append("path")
+  .attr("d", "M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z")
+  .attr("stroke", "#323232")
+  .attr("stroke-width", "2");
+
+  svg.append("path")
+  .attr("d", "M12 8L12 13")
+  .attr("stroke", "#323232")
+  .attr("stroke-width", "2")
+  .attr("stroke-linecap", "round");
+
+  svg.append("path")
+  .attr("d", "M12 16V15.9888")
+  .attr("stroke", "#323232")
+  .attr("stroke-width", "2")
+  .attr("stroke-linecap", "round");
+
+node
+  .append("text")
+  .attr("dx", 12)
+  .attr("dy", ".35em")
+  .text(function (d) {
+    return d.id;
+  });
+
+force.on("tick", function () {
+  link
+    .attr("x1", function (d) {
+      return d.source.x;
+    })
+    .attr("y1", function (d) {
+      return d.source.y;
+    })
+    .attr("x2", function (d) {
+      return d.target.x;
+    })
+    .attr("y2", function (d) {
+      return d.target.y;
+    });
+
+  node.attr("transform", function (d) {
+    return "translate(" + d.x + "," + d.y + ")";
+  });
+});
+}
+);
+</script>
+</body>

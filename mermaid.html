@@ -1,0 +1,19 @@
+<html>
+    <script src="https://unpkg.com/mermaid@8.0.0/dist/mermaid.min.js"></script>
+  <body>
+    <div>
+      <h1>Dependencies</h1>
+      <div class="mermaid">
+        graph LR
+        Vmr.Dependency1[Vmr.Dependency1]
+        Vmr.Dependency2[Vmr.Dependency2]
+        Vmr.Dependency2[Vmr.Dependency2] --> Vmr.Dependency1(Vmr.Dependency1)
+        TestDotnetLibrary[TestDotnetLibrary]
+        TestDotnetWebApi[TestDotnetWebApi]
+        Vmr.Service1[Vmr.Service1]
+        Vmr.Service1[Vmr.Service1] --> Vmr.Dependency2(Vmr.Dependency2)
+      </div>
+    </div>
+  </body>
+</html>
+

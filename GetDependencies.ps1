@@ -1,5 +1,5 @@
 $allProjectFiles = Get-ChildItem -Path . -Filter *.csproj -exclude *.UnitTests.csproj, *.Specs.csproj -Recurse | Resolve-Path -Relative
-
+                
 $projects = @()
 
 foreach ($projfile in $allProjectFiles)
@@ -19,8 +19,21 @@ foreach ($projfile in $allProjectFiles)
     }
 
     Write-Host $r
+
+    $type = "none"
+
+    $content = Get-Content -Path $projfile -Raw
+    if($content.Contains("Microsoft.NET.Sdk.Web"))
+    {
+      $type = "Web"
+    }
+    elseif ($content.Contains("Microsoft.NET.Sdk")) {
+      $type = "Library"
+    }
+
     $project = @{
         Project = (Get-Item $projfile).Basename
+        Type = $type
         References = $projectReferencesArray
     }
 
@@ -32,7 +45,10 @@ $nodes = @()
 $links = @()
 foreach($p in $projects)
 {
-    $nodes += @{id = $p.Project}
+    $nodes += @{
+      id = $p.Project
+      type = $p.Type
+    }
 
     Write-Host "proj: " + $p.Project
     foreach($r in $p.References)
@@ -50,6 +66,4 @@ $root = @{
     nodes = $nodes
     links = $links
 }
-$json = $root | ConvertTo-Json | Out-File -FilePath .\d3js.json
-Write-Host $json;
-
+$root | ConvertTo-Json | Out-File -FilePath .\d3js.json
